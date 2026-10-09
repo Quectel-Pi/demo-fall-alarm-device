@@ -1,5 +1,5 @@
-# -*- coding: gbk -*-
-"""ÈÕÖ¾¹ÜÀíÀà"""
+# -*- coding: utf-8 -*-
+"""æ—¥å¿—ç®¡ç†ç±»"""
 
 
 class LogManager:

@@ -1,4 +1,4 @@
-# -*- coding: gbk -*-
+# -*- coding: utf-8 -*-
 import os
 import warnings
 import cv2
@@ -9,21 +9,19 @@ from log_manager import LogManager
 
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 
-# ������
-MIN_CONFIDENCE = 0.4
-MIN_KEYPOINTS = 10
+# 检测参数
+MIN_CONFIDENCE = 0.4    # 关键点置信度低于0.4视为无效
+MIN_KEYPOINTS = 10      # 一个人至少要有10个有效关键点才保留
 
-YOLO_IMG_SIZE = 320
+YOLO_IMG_SIZE = 320     # YOLO的输入分辨率（320x320，越小推理越快）
 
-# ���������ֵ
-FALL_BODY_ANGLE_THRESHOLD = 55
-FALL_HEIGHT_RATIO_THRESHOLD = 1.2
-FALL_MIN_CONFIDENCE = 0.75
-FALL_CONFIRM_FRAMES = 3
+# 跌倒检测阈值
+FALL_BODY_ANGLE_THRESHOLD = 55     # 躯干倾斜 >55° 判为跌倒
+FALL_HEIGHT_RATIO_THRESHOLD = 1.2  # 身高/肩宽 <1.2 判为跌倒
 
-# ֻ������
+# 只检测跌倒
 LABEL_NAMES = {2: "DOWN"}
-STATE_TO_CN = {"DOWN": "����"}
+STATE_TO_CN = {"DOWN": "跌倒"}
 COLOR_MAP = {
     "DOWN": (0, 0, 255),
 }
@@ -35,8 +33,6 @@ class FallDetector:
         self.classifier = None
         self.scaler = None
         self.models_loaded = False
-        self._fall_history = {}
-        self._max_history = FALL_CONFIRM_FRAMES
         self._load_models(model_dir)
 
     def _load_models(self, model_dir: str):
@@ -77,6 +73,11 @@ class FallDetector:
             LogManager.append_log(f"Failed to load models: {str(e)}", "ERROR")
             self.models_loaded = False
 
+
+    # 输入三个关键点，输出它们之间的夹角。
+    # 比如输入（左肩、左肘、左腕）→ 算出肘关节弯曲了多少度。
+    # 跌倒时人的关节角度和正常站立完全不同。
+    # 膝盖可能是直的（180°）→ 弯曲的（90°）。这些角度变化是判断姿态的关键特征。
     @staticmethod
     def calculate_angle(p1, p2, p3):
         if p1 is None or p2 is None or p3 is None:
@@ -91,6 +92,8 @@ class FallDetector:
         cos_angle = np.clip(cos_angle, -1, 1)
         return np.degrees(np.arccos(cos_angle))
 
+
+    # 提取 88 维特征（17×3 坐标+置信度 + 8 关节角度 + 13×2 相对坐标 + 3 身体形态）
     def extract_features(self, keypoints_norm, confidences):
         features = []
         for i in range(17):
@@ -141,25 +144,33 @@ class FallDetector:
 
         detected = []
         for result in results:
+            # 没人，直接跳过
             if result.keypoints is None:
                 continue
+
+            # 多人检测
             keypoints_data = result.keypoints.data.cpu().numpy()
 
             for kp in keypoints_data:
                 xy = kp[:, :2]
                 conf = kp[:, 2]
                 valid_count = np.sum(conf > MIN_CONFIDENCE)
+
+                # 过滤：有效关键点少于10个 → 跳过
                 if valid_count < MIN_KEYPOINTS:
                     continue
 
+                # 过滤：5个核心点（鼻子、肩膀x2、髋部x2）少于4个 → 跌倒
                 core_indices = [0, 5, 6, 11, 12]
                 core_valid = sum(1 for i in core_indices if conf[i] > MIN_CONFIDENCE)
                 if core_valid < 4:
                     continue
 
+                # 过滤：身体结构比例异常（肩宽/髋宽 <0.3 或 >3.0）→ 跌倒
                 if not self._validate_body_structure(xy, conf):
                     continue
-
+                    
+                #为什么做这么多过滤？ 因为YOLO 有时会把背景里的椅子、海报上的人误检成人体。
                 xy_norm = xy.copy()
                 xy_norm[:, 0] /= w
                 xy_norm[:, 1] /= h
@@ -168,18 +179,21 @@ class FallDetector:
                 if self.scaler is not None:
                     features = self.scaler.transform(features)
 
-                pred_label = self.classifier.predict(features)[0]
-                pred_proba = self.classifier.predict_proba(features)[0]
-                pred_conf = pred_proba[pred_label]
+                pred_label = self.classifier.predict(features)[0]   # 输出0/1/2
+                pred_proba = self.classifier.predict_proba(features)[0]  # 输出概率
+                pred_conf = pred_proba[pred_label]    # 取预测结果的概率
 
                 pred_conf = np.clip(pred_conf, 0.0, 1.0)
                 pred_state = LABEL_NAMES.get(pred_label, "UNKNOWN")
 
-                # ֻ��������
+                # 只保留跌倒
                 if pred_state != "DOWN":
                     continue
 
-                # ������֤����
+                # 二次验证跌倒
+
+                # 随机森林毕竟是"学"出来的，偶尔会犯错。比如老人弯腰捡东西，可能被误判为跌倒。
+                # 几何规则是明确的硬条件——躯干角度必须 >55°，高宽比必须 <1.2，
                 if pred_state == 'DOWN':
                     is_valid_fall, fall_conf = self._verify_fall_pose(xy, conf, h, w)
                     fall_conf = np.clip(fall_conf, 0.0, 1.0)
@@ -204,8 +218,12 @@ class FallDetector:
                     'keypoints': xy,
                     'keypoints_conf': conf
                 })
+        # 非极大值抑制：合并同一个人重叠的框（YOLO可能对同一个人输出多组关键点）
+        detected = self._apply_nms(detected, iou_threshold=0.5)
         return detected
 
+    # 正常人体的肩宽和髋宽比例在 0.3~3.0 之间。
+    # 有可能检测出来的"人体"比例严重失调（比如 YOLO 把两个人误检成一个人）
     def _validate_body_structure(self, xy, conf):
         try:
             if conf[5] > MIN_CONFIDENCE and conf[6] > MIN_CONFIDENCE and conf[11] > MIN_CONFIDENCE and conf[12] > MIN_CONFIDENCE:
@@ -219,6 +237,8 @@ class FallDetector:
             pass
         return True
 
+
+    # 进行规则打分
     def _verify_fall_pose(self, xy, conf, img_h, img_w):
         fall_score = 0.0
         max_score = 5.0
@@ -261,7 +281,8 @@ class FallDetector:
 
         confidence = fall_score / max_score
         return fall_score >= 3.0, confidence
-
+    # 站着的关键点垂直散布大（从头顶到脚踝），水平散布小。
+    # 躺倒的关键点水平散布大，垂直散布小。这个函数用方差比来量化这个特征。
     def _analyze_horizontal_distribution(self, xy, conf, img_h, img_w):
         score = 0.0
         pts = []
@@ -283,6 +304,9 @@ class FallDetector:
         if yr < 0.25: score += 1
         return max(0, score)
 
+
+    # 人跌倒后身体会接触地面（在画面中表现为关键点集中在下半部分）。
+    # 站着的人关键点分布在整个画面，跌倒了就集中在下方。
     def _analyze_ground_contact(self, xy, conf, img_h, img_w):
         score = 0.0
         bottom = img_h * 0.7
@@ -338,3 +362,38 @@ class FallDetector:
             cv2.putText(img, ts, (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         return img
+
+    @staticmethod
+    def _apply_nms(detections, iou_threshold=0.5):
+        """对重叠度高的检测框做非极大值抑制，保留置信度最高的那个"""
+        if not detections:
+            return []
+
+        # 按置信度从高到低排序
+        sorted_dets = sorted(detections, key=lambda x: x['confidence'], reverse=True)
+        kept = []
+
+        for det in sorted_dets:
+            x1, y1, x2, y2 = det['bbox']
+            # 检查与已保留的框是否有高度重叠
+            is_duplicate = False
+            for kept_det in kept:
+                kx1, ky1, kx2, ky2 = kept_det['bbox']
+                # 计算交集
+                ix1 = max(x1, kx1)
+                iy1 = max(y1, ky1)
+                ix2 = min(x2, kx2)
+                iy2 = min(y2, ky2)
+                if ix1 < ix2 and iy1 < iy2:
+                    inter_area = (ix2 - ix1) * (iy2 - iy1)
+                    area1 = (x2 - x1) * (y2 - y1)
+                    area2 = (kx2 - kx1) * (ky2 - ky1)
+                    union_area = area1 + area2 - inter_area
+                    iou = inter_area / union_area if union_area > 0 else 0
+                    if iou > iou_threshold:
+                        is_duplicate = True
+                        break
+            if not is_duplicate:
+                kept.append(det)
+
+        return kept
