@@ -1,4 +1,4 @@
-# -*- coding: gbk -*-
+# -*- coding: utf-8 -*-
 import serial
 import time
 from log_manager import LogManager
@@ -6,7 +6,6 @@ from serial import SerialException
 
 
 class LightController:
-    """µÆ¹â¿ØÖÆÆ÷"""
     
     def __init__(self, port='/dev/ttyUSB0', baudrate=9600):
         self.port = port
@@ -27,34 +26,33 @@ class LightController:
     def turn_on(self):
         try:
             self._init_serial()
-            # ºìµÆÁÁÖ¸Áî
-            hex_data = [0xFF, 0x04, 0x01, 0x03,0xAA]
+            # å¼€ç¯æŒ‡ä»¤
+            hex_data = [0xFF, 0x04, 0x01, 0x03, 0xAA]
             self.ser.write(bytes(hex_data))
             self.is_light_on = True
             self.close()
-            LogManager.append_log("ºìµÆÒÑ´ò¿ª", "INFO")
+            LogManager.append_log("ç¯å…‰å·²æ‰“å¼€", "INFO")
             return True
         except SerialException as e:
-            print(f"´®¿Ú²Ù×÷Ê§°Ü£º{e}")
+            print(f"ä¸²å£æ“ä½œå¤±è´¥: {e}")
             return False
         except Exception as e:
-            print(f"ÆäËû´íÎó£º{e}")
+            print(f"å¼€ç¯å¼‚å¸¸: {e}")
             return False
 
     def turn_off(self):
         try:
             self._init_serial()
-            # ¹ØµÆÖ¸Áî
-            hex_data = [0xFF, 0x01, 0x01, 0x03,0xAA]
+            # å…³ç¯æŒ‡ä»¤
+            hex_data = [0xFF, 0x01, 0x01, 0x03, 0xAA]
             self.ser.write(bytes(hex_data))
             self.is_light_on = False
             self.close()
-            LogManager.append_log("ºìµÆÒÑ¹Ø±Õ", "INFO")
+            LogManager.append_log("ç¯å…‰å·²å…³é—­", "INFO")
             return True
         except Exception as e:
-            LogManager.append_log(f"¹ØµÆÊ§°Ü: {str(e)}", "ERROR")
+            LogManager.append_log(f"å…³ç¯å¤±è´¥: {str(e)}", "ERROR")
             return False
 
     def close(self):
         self.ser.close()
-   

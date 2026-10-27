@@ -1,6 +1,6 @@
-# -*- coding: gbk -*-
+# -*- coding: utf-8 -*-
 """
-UI¹ÜÀíÀà
+UIç®¡ç†ç±»
 """
 import os
 from PySide6.QtWidgets import (
@@ -13,13 +13,13 @@ from log_manager import LogManager
 from camera_manager import CameraManager
 
 
-# Ô¤ÀÀ³ß´ç
+# é¢„è§ˆå°ºå¯¸
 PREVIEW_WIDTH = 1280
 PREVIEW_HEIGHT = 720
 
 
 class ScalableLabel(QLabel):
-    """¿É×ÔÊÊÓ¦±ÈÀıËõ·ÅµÄÔ¤ÀÀ±êÇ©£¬Ö§³ÖË«»÷ÇĞ»»È«ÆÁ"""
+    """å¯è‡ªé€‚åº”æ¯”ä¾‹ç¼©æ”¾çš„é¢„è§ˆæ ‡ç­¾ï¼Œæ”¯æŒåŒå‡»åˆ‡æ¢å…¨å±"""
     
     def __init__(self, aspect_ratio=16/9, parent=None):
         super().__init__(parent)
@@ -84,7 +84,7 @@ class ScalableLabel(QLabel):
         return scale, offset_x, offset_y
     
     def mouseDoubleClickEvent(self, event):
-        """Ë«»÷ÇĞ»»È«ÆÁ/»¹Ô­Ô¤ÀÀ"""
+        """åŒå‡»åˆ‡æ¢å…¨å±/è¿˜åŸé¢„è§ˆ"""
         if event.button() == Qt.LeftButton:
             if hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), '_toggle_fullscreen_preview'):
                 self.parent().parent()._toggle_fullscreen_preview()
@@ -92,10 +92,10 @@ class ScalableLabel(QLabel):
 
 
 class UIManager(QWidget):
-    """Ö÷½çÃæ¹ÜÀíÀà"""
+    """ä¸»ç•Œé¢ç®¡ç†ç±»"""
     
     def setup_styles(self):
-        """ÉèÖÃ½çÃæÑùÊ½"""
+        """è®¾ç½®ç•Œé¢æ ·å¼"""
         self.setStyleSheet("""
         QWidget {
             background-color: #1e1e2e;
@@ -105,7 +105,7 @@ class UIManager(QWidget):
         QLabel {
             background-color: transparent;
         }
-        /* ¹ö¶¯ÇøÓòÑùÊ½ */
+        /* æ»šåŠ¨åŒºåŸŸæ ·å¼ */
         QScrollArea {
             background-color: transparent;
             border: none;
@@ -140,7 +140,7 @@ class UIManager(QWidget):
             border: 2px solid #585b70;
             margin-bottom: 15px;
         }
-        /* Í³Ò»µÄGroupBoxÑùÊ½ */
+        /* ç»Ÿä¸€çš„GroupBoxæ ·å¼ */
         QGroupBox {
             color: #89b4fa;
             font-weight: bold;
@@ -157,7 +157,7 @@ class UIManager(QWidget):
             background: transparent;
             padding: 0 8px;
         }
-        /* LogÇøÓòÄÚ²¿ÑùÊ½ */
+        /* LogåŒºåŸŸå†…éƒ¨æ ·å¼ */
         #log_text_edit {
             background-color: #1a1a28;
             color: #cdd6f4;
@@ -168,7 +168,7 @@ class UIManager(QWidget):
             padding: 8px;
             min-height: 140px;
         }
-        /* ¹¦ÄÜ°´Å¥ÑùÊ½ */
+        /* åŠŸèƒ½æŒ‰é’®æ ·å¼ */
         QPushButton[func_btn=true] {
             background-color: #89b4fa;
             color: #1e1e2e;
@@ -181,7 +181,7 @@ class UIManager(QWidget):
         }
         QPushButton[func_btn=true]:hover { background-color: #74c7ec; }
         QPushButton[func_btn=true]:pressed { background-color: #585b70; }
-        /* Ïà»ú¿ØÖÆ°´Å¥ */
+        /* ç›¸æœºæ§åˆ¶æŒ‰é’® */
         QPushButton[start_btn=true] {
             background-color: #a6e3a1;
             color: #1e1e2e;
@@ -224,26 +224,26 @@ class UIManager(QWidget):
         super().__init__(parent)
         self.setup_styles()
         
-        # »ñÈ¡Â·¾¶
+        # è·å–è·¯å¾„
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_dir = os.path.dirname(script_dir)
         model_dir = os.path.join(project_dir, "model")
         picture_dir = os.path.join(project_dir, "picture")
         
-        # ³õÊ¼»¯Ïà»ú¹ÜÀíÆ÷
+        # åˆå§‹åŒ–ç›¸æœºç®¡ç†å™¨
         self._camera_manager = CameraManager(model_dir, picture_dir)
         
-        # È«ÆÁ×´Ì¬
+        # å…¨å±çŠ¶æ€
         self._is_fullscreen_preview = False
         
-        # ´°¿ÚÅäÖÃ
+        # çª—å£é…ç½®
         self.setWindowTitle("Fall Alarm System")
         self._setup_window_size()
         
-        # ³õÊ¼»¯²¼¾Ö
+        # åˆå§‹åŒ–å¸ƒå±€
         self._init_main_layout()
         
-        # ³õÊ¼»¯ÈÕÖ¾
+        # åˆå§‹åŒ–æ—¥å¿—
         LogManager.append_log("Fall Alarm System starting...", "INFO")
         
         if self._camera_manager.is_models_loaded():
@@ -253,20 +253,23 @@ class UIManager(QWidget):
             LogManager.append_log("Models failed to load", "ERROR")
             self.update_tips("Status: Error - Models failed to load [Error]")
         
-        # ¶¨Ê±Æ÷ÅäÖÃ
+        # å®šæ—¶å™¨é…ç½®
         self._preview_timer = QTimer(self)
         self._preview_timer.timeout.connect(self._update_preview)
         self._preview_timer.start(33)  # 30 FPS
         
-        # ÈÕÖ¾Ë¢ĞÂ¶¨Ê±Æ÷
+        # æ—¥å¿—åˆ·æ–°å®šæ—¶å™¨ - é™ä½åˆ°200mså‡å°‘ä¸»çº¿ç¨‹è´Ÿæ‹…
         self._log_timer = QTimer(self)
         self._log_timer.timeout.connect(self._refresh_log)
-        self._log_timer.start(100)
+        self._log_timer.start(200)
+        
+        # æ—¥å¿—è¡Œæ•°ç¼“å­˜ï¼Œé¿å…æ— æ•ˆçš„HTMLé‡ç»˜
+        self._last_log_count = 0
         
         LogManager.append_log("UI initialized successfully", "INFO")
     
     def _setup_window_size(self):
-        """¸ù¾İÆÁÄ»´óĞ¡×ÔÊÊÓ¦ÉèÖÃ´°¿Ú³ß´ç"""
+        """æ ¹æ®å±å¹•å¤§å°è‡ªé€‚åº”è®¾ç½®çª—å£å°ºå¯¸"""
         screen = self.screen()
         if screen is None:
             self.setMinimumSize(800, 600)
@@ -292,7 +295,7 @@ class UIManager(QWidget):
         self._center_window(available_geometry)
     
     def _center_window(self, available_geometry: QRect):
-        """½«´°¿Ú¾ÓÖĞÏÔÊ¾"""
+        """å°†çª—å£å±…ä¸­æ˜¾ç¤º"""
         window_width = self.width()
         window_height = self.height()
         x = available_geometry.x() + (available_geometry.width() - window_width) // 2
@@ -300,7 +303,7 @@ class UIManager(QWidget):
         self.move(x, y)
     
     def _init_main_layout(self):
-        """³õÊ¼»¯Ö÷²¼¾Ö"""
+        """åˆå§‹åŒ–ä¸»å¸ƒå±€"""
         main_v = QVBoxLayout(self)
         main_v.setContentsMargins(20, 20, 20, 20)
         main_v.setSpacing(10)
@@ -326,7 +329,7 @@ class UIManager(QWidget):
         self.preview_label.setText("Click 'Start Camera' to begin preview")
         left_v.addWidget(self.preview_label, stretch=8)
         
-        # ¿ØÖÆ°´Å¥
+        # æ§åˆ¶æŒ‰é’®
         btn_w = QWidget()
         btn_v = QVBoxLayout(btn_w)
         btn_v.setSpacing(10)
@@ -346,7 +349,7 @@ class UIManager(QWidget):
         
         self.bottom_h_layout.addWidget(left_w)
         
-        # ===== ÓÒÀ¸£ºÈÕÖ¾Çø =====
+        # ===== å³æ ï¼šæ—¥å¿—åŒº =====
         self.right_scroll = QScrollArea()
         self.right_scroll.setWidgetResizable(True)
         self.right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -358,7 +361,7 @@ class UIManager(QWidget):
         right_v.setContentsMargins(5, 0, 5, 0)
         right_v.setSpacing(10)
         
-        # ÈÕÖ¾ÇøÓò
+        # æ—¥å¿—åŒºåŸŸ
         log_group = QGroupBox("Log")
         log_layout = QVBoxLayout(log_group)
         log_layout.setContentsMargins(0, 0, 0, 0)
@@ -377,22 +380,22 @@ class UIManager(QWidget):
         self.bottom_h_layout.addWidget(self.right_scroll)
         main_v.addLayout(self.bottom_h_layout)
         
-        # °ó¶¨°´Å¥ÊÂ¼ş
+        # ç»‘å®šæŒ‰é’®äº‹ä»¶
         self._bind_events()
     
     def _bind_events(self):
-        """°ó¶¨°´Å¥ÊÂ¼ş"""
+        """ç»‘å®šæŒ‰é’®äº‹ä»¶"""
         self.btn_start.clicked.connect(self._start_camera)
         self.btn_stop.clicked.connect(self._stop_camera)
     
     def _start_camera(self):
-        """Æô¶¯Ïà»ú"""
+        """å¯åŠ¨ç›¸æœº"""
         if not self._camera_manager.is_models_loaded():
             LogManager.append_log("Cannot start camera: Models not loaded", "ERROR")
             self.update_tips("Status: Error - Models not loaded [Error]")
             return
         
-        # ×Ô¶¯¼ì²â²¢Æô¶¯Ïà»ú
+        # è‡ªåŠ¨æ£€æµ‹å¹¶å¯åŠ¨ç›¸æœº
         success = self._camera_manager.start_preview()
         if success:
             self.btn_start.setEnabled(False)
@@ -403,7 +406,7 @@ class UIManager(QWidget):
             self.update_tips("Status: Error - No available camera found [Error]")
     
     def _stop_camera(self):
-        """Í£Ö¹Ïà»ú"""
+        """åœæ­¢ç›¸æœº"""
         self._camera_manager.stop_preview()
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
@@ -421,7 +424,7 @@ class UIManager(QWidget):
             self.update_tips(f"Status: Capture failed - {message} [Error]")
     
     def _toggle_fullscreen_preview(self):
-        """ÇĞ»»Ô¤ÀÀÇøÈ«ÆÁ/»¹Ô­×´Ì¬"""
+        """åˆ‡æ¢é¢„è§ˆåŒºå…¨å±/è¿˜åŸçŠ¶æ€"""
         self._is_fullscreen_preview = not self._is_fullscreen_preview
         
         if self._is_fullscreen_preview:
@@ -436,18 +439,23 @@ class UIManager(QWidget):
             self.preview_label.setStyleSheet("background:#333; color:white; border-radius:8px;")
     
     def update_tips(self, text):
-        """¸üĞÂÌáÊ¾ĞÅÏ¢"""
+        """æ›´æ–°æç¤ºä¿¡æ¯"""
         self.tips_label.setText(text)
     
     def _update_preview(self):
-        """¸üĞÂÔ¤ÀÀ»­Ãæ"""
+        """æ›´æ–°é¢„è§ˆç”»é¢"""
         self._camera_manager.update_preview_frame(self.preview_label)
         
     
     def _refresh_log(self):
-        """Ë¢ĞÂÈÕÖ¾ÏÔÊ¾"""
+        """åˆ·æ–°æ—¥å¿—æ˜¾ç¤ºï¼ˆå¸¦ç¼“å­˜ä¼˜åŒ–ï¼Œé¿å…æ— æ•ˆçš„HTMLé‡ç»˜ï¼‰"""
         new_log_lines = LogManager.get_log_lines()
         
+        # å¦‚æœæ—¥å¿—è¡Œæ•°æ²¡å˜åŒ–ï¼Œè·³è¿‡é‡ç»˜
+        if len(new_log_lines) == self._last_log_count:
+            return
+        self._last_log_count = len(new_log_lines)
+
         html = """
         <style>
             body {
@@ -479,27 +487,26 @@ class UIManager(QWidget):
         
         html += "</body>"
         
-        if self.log_edit.toHtml() != html:
-            scroll = self.log_edit.verticalScrollBar()
-            old_value = scroll.value()
-            old_max = scroll.maximum()
-            was_at_bottom = (old_value >= old_max - 5)
-            
-            self.log_edit.setHtml(html)
-            
-            if was_at_bottom:
-                cursor = self.log_edit.textCursor()
-                cursor.movePosition(QTextCursor.End)
-                self.log_edit.setTextCursor(cursor)
-                self.log_edit.ensureCursorVisible()
-            else:
-                new_max = scroll.maximum()
-                if new_max > 0:
-                    new_value = int(old_value * new_max / max(old_max, 1))
-                    scroll.setValue(new_value)
+        scroll = self.log_edit.verticalScrollBar()
+        old_value = scroll.value()
+        old_max = scroll.maximum()
+        was_at_bottom = (old_value >= old_max - 5)
+        
+        self.log_edit.setHtml(html)
+        
+        if was_at_bottom:
+            cursor = self.log_edit.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self.log_edit.setTextCursor(cursor)
+            self.log_edit.ensureCursorVisible()
+        else:
+            new_max = scroll.maximum()
+            if new_max > 0:
+                new_value = int(old_value * new_max / max(old_max, 1))
+                scroll.setValue(new_value)
     
     def closeEvent(self, event):
-        """´°¿Ú¹Ø±ÕÊÂ¼ş"""
+        """çª—å£å…³é—­äº‹ä»¶"""
         self._camera_manager.stop_preview()
         LogManager.append_log("Application closed", "INFO")
         event.accept()

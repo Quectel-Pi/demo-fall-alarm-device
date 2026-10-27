@@ -1,4 +1,4 @@
-# -*- coding: gbk -*-
+# -*- coding: utf-8 -*-
 import os
 import sys
 import glob
@@ -12,7 +12,7 @@ from log_manager import LogManager
 from fall_detector import FallDetector
 from light_control import LightController
 
-SERVER_IP = "118.25.198.12"
+SERVER_IP = "118.31.23.236"
 SERVER_UPLOAD_URL = f"http://{SERVER_IP}:8000/upload_fall"
 
 class CameraManager:
@@ -146,6 +146,8 @@ class CameraManager:
     def _preview_thread_func(self, idx):
         if sys.platform.startswith('linux'):
             cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+            # 设置MJPG格式可大幅提升USB相机帧率（降低USB带宽占用）
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
         else:
             cap = cv2.VideoCapture(idx)
         if not cap.isOpened():
@@ -156,38 +158,47 @@ class CameraManager:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.PREVIEW_HEIGHT)
         cap.set(cv2.CAP_PROP_FPS, 30)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        for _ in range(5): cap.read()
+        for _ in range(5):
+            cap.read()
 
         cnt = 0
         t0 = time.time()
         while self._preview_running:
             ret, frame = cap.read()
             if not ret:
-                time.sleep(0.05)
+                time.sleep(0.005)
                 continue
             cnt += 1
             now = time.time()
+
+            # 单次获取检测结果，避免重复加锁
             with self._detect_lock:
                 res = self._cached_detected.copy()
-            if len(res) == 0 and (now - self._last_fall_detected_time) < self.FALL_DISPLAY_DURATION:
-                with self._detect_lock:
+                # 如果在持续显示窗口内但没有新结果，复用旧结果
+                if not res and (now - self._last_fall_detected_time) < self.FALL_DISPLAY_DURATION:
                     res = self._cached_detected.copy()
-            # ���ƽ��
-            if len(res) > 0:
+
+            # draw_results内部已经copy()，无需外部再copy
+            if res:
                 disp = FallDetector.draw_results(frame, res, only_down=True)
             else:
-                disp = frame.copy()
+                disp = frame  # cvtColor会创建新数组，无需提前copy
+
+            # cvtColor返回新数组，可直接用于显示
             rgb = cv2.cvtColor(disp, cv2.COLOR_BGR2RGB)
+
             with self._frame_lock:
                 self._current_frame = frame.copy()
                 self._display_frame = rgb
             self._frame_ready = True
+
             with self._detect_frame_lock:
                 self._detect_frame = frame.copy()
-            # FPSͳ��
-            if time.time() - t0 > 5:
-                self._preview_fps = cnt / (time.time() - t0)
-                t0 = time.time()
+
+            # FPS统计
+            if now - t0 > 5:
+                self._preview_fps = cnt / (now - t0)
+                t0 = now
                 cnt = 0
         cap.release()
 
@@ -199,14 +210,14 @@ class CameraManager:
         err = 0
         while self._detect_running:
             now = time.time()
-            # �Զ��ص�
+            # 自动关灯
             if self._light_controller.is_light_on and now - self._last_fall_time > 10:
                 self._light_controller.turn_off()
 
             if now - last >= self.DETECT_INTERVAL:
                 with self._detect_frame_lock:
                     if self._detect_frame is None:
-                        time.sleep(0.05)
+                        time.sleep(0.005)
                         continue
                     f = self._detect_frame.copy()
 
@@ -215,14 +226,11 @@ class CameraManager:
                     cnt += 1
                     err = 0
                     fall_persons = []
-                    # ֻ������������
                     for p in persons:
                         if p['state'] == 'DOWN' and p['confidence'] >= self.FALL_CONFIDENCE_THRESHOLD:
                             fall_persons.append(p)
-                    # ���»���ĵ������
                     with self._detect_lock:
                         self._cached_detected = fall_persons.copy()
-                    # �����⵽���������������ʱ��
                     if len(fall_persons) > 0:
                         self._last_fall_detected_time = now
                         self._fall_count += len(fall_persons)
@@ -238,9 +246,9 @@ class CameraManager:
                         time.sleep(5)
                         err = 0
                     else:
-                        time.sleep(0.5)
+                        time.sleep(0.1)
             else:
-                time.sleep(0.01)
+                time.sleep(0.005)
 
             if now - t0 > 5:
                 self._detect_fps = cnt / (now - t0)
@@ -256,7 +264,8 @@ class CameraManager:
                 return
             img = self._display_frame.copy()
         h, w, ch = img.shape
-        qimg = QImage(img.data, w, h, ch * w, QImage.Format.Format_RGB888)
+        # 关键修复：.copy() 确保 QImage 拥有数据所有权，防止img析构后数据悬空
+        qimg = QImage(img.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
         label.setPixmap(QPixmap.fromImage(qimg))
         self._frame_ready = False
 
